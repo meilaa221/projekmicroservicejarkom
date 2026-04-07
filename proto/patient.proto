@@ -1,0 +1,18 @@
+syntax = "proto3";
+
+package patient;
+
+service PatientService {
+  rpc ValidateMedicalRecord (PatientRequest) returns (MedicalResponse);
+}
+
+message PatientRequest {
+  string patient_id = 1;
+  string name = 2;
+}
+
+message MedicalResponse {
+  bool is_valid = 1;
+  string message = 2;
+  string draft_record_id = 3;
+}

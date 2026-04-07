@@ -1,0 +1,913 @@
+<!DOCTYPE html>
+<html lang="id">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>MedisApp - Sistem Manajemen Pasien</title>
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    body { font-family: 'Segoe UI', Arial, sans-serif; background: #f0f2f5; display: flex; min-height: 100vh; }
+
+    /* Sidebar */
+    .sidebar { width: 240px; background: #1e1b4b; color: white; position: fixed; height: 100vh; display: flex; flex-direction: column; z-index: 10; }
+    .sidebar-header { padding: 24px 20px; border-bottom: 1px solid rgba(255,255,255,0.1); }
+    .sidebar-header h1 { font-size: 17px; font-weight: 700; }
+    .sidebar-header p { font-size: 11px; color: rgba(255,255,255,0.45); margin-top: 4px; }
+    .sidebar-nav { padding: 12px 0; flex: 1; }
+    .nav-item { display: flex; align-items: center; gap: 12px; padding: 12px 20px; cursor: pointer; color: rgba(255,255,255,0.65); transition: all 0.15s; font-size: 14px; border-left: 3px solid transparent; }
+    .nav-item:hover { background: rgba(255,255,255,0.08); color: white; }
+    .nav-item.active { background: rgba(79,70,229,0.35); color: white; border-left-color: #818cf8; }
+    .nav-icon { font-size: 17px; width: 20px; text-align: center; }
+    .sidebar-footer { padding: 14px 20px; border-top: 1px solid rgba(255,255,255,0.1); }
+    .service-pill { display: flex; align-items: center; gap: 6px; font-size: 11px; color: rgba(255,255,255,0.4); margin-bottom: 4px; }
+    .dot { width: 6px; height: 6px; border-radius: 50%; background: #4ade80; }
+
+    /* Main */
+    .main { margin-left: 240px; flex: 1; min-height: 100vh; }
+    .topbar { background: white; padding: 0 32px; height: 60px; border-bottom: 1px solid #e5e7eb; display: flex; align-items: center; justify-content: space-between; position: sticky; top: 0; z-index: 5; }
+    .topbar h2 { font-size: 17px; font-weight: 600; color: #111827; }
+    .content { padding: 28px 32px; }
+
+    /* Stats */
+    .stats-grid { display: grid; grid-template-columns: repeat(4, 1fr); gap: 16px; margin-bottom: 24px; }
+    .stat-card { background: white; border-radius: 12px; padding: 20px 22px; border: 1px solid #e5e7eb; }
+    .stat-label { font-size: 12px; color: #6b7280; font-weight: 500; margin-bottom: 8px; text-transform: uppercase; letter-spacing: 0.04em; }
+    .stat-value { font-size: 30px; font-weight: 700; line-height: 1; }
+    .stat-sub { font-size: 12px; color: #9ca3af; margin-top: 6px; }
+    .stat-blue .stat-value { color: #2563eb; }
+    .stat-purple .stat-value { color: #7c3aed; }
+    .stat-green .stat-value { color: #16a34a; }
+    .stat-yellow .stat-value { color: #d97706; }
+
+    /* Card */
+    .card { background: white; border-radius: 12px; border: 1px solid #e5e7eb; overflow: hidden; }
+    .card-header { padding: 16px 24px; border-bottom: 1px solid #e5e7eb; display: flex; align-items: center; justify-content: space-between; gap: 16px; }
+    .card-header h3 { font-size: 15px; font-weight: 600; color: #111827; white-space: nowrap; }
+
+    /* Table */
+    .table-wrap { overflow-x: auto; }
+    table { width: 100%; border-collapse: collapse; }
+    th { background: #f9fafb; padding: 11px 16px; text-align: left; font-size: 11px; font-weight: 600; color: #6b7280; text-transform: uppercase; letter-spacing: 0.05em; border-bottom: 1px solid #e5e7eb; white-space: nowrap; }
+    td { padding: 13px 16px; font-size: 14px; color: #374151; border-bottom: 1px solid #f3f4f6; }
+    tr:last-child td { border-bottom: none; }
+    tbody tr:hover td { background: #f9fafb; }
+    .empty-cell { text-align: center; padding: 40px; color: #9ca3af; font-size: 14px; }
+
+    /* Badge */
+    .badge { display: inline-block; padding: 3px 10px; border-radius: 20px; font-size: 12px; font-weight: 500; }
+    .badge-draft { background: #fef3c7; color: #92400e; }
+    .badge-aktif { background: #d1fae5; color: #065f46; }
+    .badge-laki { background: #dbeafe; color: #1e40af; }
+    .badge-perempuan { background: #fce7f3; color: #9d174d; }
+
+    /* Button */
+    .btn { display: inline-flex; align-items: center; gap: 6px; padding: 9px 18px; border-radius: 8px; border: none; cursor: pointer; font-size: 14px; font-weight: 500; transition: all 0.15s; }
+    .btn-primary { background: #4f46e5; color: white; }
+    .btn-primary:hover { background: #4338ca; }
+    .btn-secondary { background: #f3f4f6; color: #374151; }
+    .btn-secondary:hover { background: #e5e7eb; }
+    .btn-success { background: #16a34a; color: white; }
+    .btn-success:hover { background: #15803d; }
+    .btn-danger { background: #ef4444; color: white; }
+    .btn-danger:hover { background: #dc2626; }
+    .btn-sm { padding: 5px 12px; font-size: 12px; }
+    .btn-outline { background: transparent; border: 1px solid #d1d5db; color: #4f46e5; }
+    .btn-outline:hover { background: #ede9fe; border-color: #4f46e5; }
+    .btn-outline-danger { background: transparent; border: 1px solid #fca5a5; color: #ef4444; }
+    .btn-outline-danger:hover { background: #fee2e2; border-color: #ef4444; }
+
+    /* Search */
+    .search-input { padding: 8px 14px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 14px; width: 220px; outline: none; }
+    .search-input:focus { border-color: #4f46e5; box-shadow: 0 0 0 3px rgba(79,70,229,0.1); }
+    .toolbar { display: flex; align-items: center; gap: 10px; }
+
+    /* Modal */
+    .modal-overlay { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.45); z-index: 50; align-items: center; justify-content: center; }
+    .modal-overlay.open { display: flex; }
+    .modal { background: white; border-radius: 16px; width: 580px; max-height: 90vh; overflow-y: auto; box-shadow: 0 20px 60px rgba(0,0,0,0.2); }
+    .modal-header { padding: 20px 24px; border-bottom: 1px solid #e5e7eb; display: flex; justify-content: space-between; align-items: center; position: sticky; top: 0; background: white; z-index: 1; }
+    .modal-header h3 { font-size: 16px; font-weight: 600; color: #111827; }
+    .modal-close { background: #f3f4f6; border: none; width: 30px; height: 30px; border-radius: 50%; cursor: pointer; font-size: 16px; color: #6b7280; display: flex; align-items: center; justify-content: center; }
+    .modal-close:hover { background: #e5e7eb; }
+    .modal-body { padding: 24px; }
+    .modal-footer { padding: 16px 24px; border-top: 1px solid #e5e7eb; display: flex; gap: 10px; justify-content: flex-end; background: #f9fafb; }
+
+    /* Form */
+    .form-row { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+    .form-group { margin-bottom: 16px; }
+    .form-group label { display: block; font-size: 13px; font-weight: 500; color: #374151; margin-bottom: 6px; }
+    .required { color: #ef4444; }
+    .form-control { width: 100%; padding: 9px 12px; border: 1px solid #d1d5db; border-radius: 8px; font-size: 14px; outline: none; color: #111827; background: white; }
+    .form-control:focus { border-color: #4f46e5; box-shadow: 0 0 0 3px rgba(79,70,229,0.1); }
+    .form-control:disabled { background: #f9fafb; color: #6b7280; }
+    select.form-control { appearance: auto; }
+    textarea.form-control { resize: vertical; min-height: 80px; }
+
+    /* Alert */
+    .alert { padding: 12px 16px; border-radius: 8px; font-size: 14px; margin-bottom: 16px; }
+    .alert-success { background: #d1fae5; color: #065f46; border: 1px solid #a7f3d0; }
+    .alert-error { background: #fee2e2; color: #991b1b; border: 1px solid #fca5a5; }
+
+    /* Page */
+    .page { display: none; }
+    .page.active { display: block; }
+
+    /* Divider */
+    .section-divider { height: 1px; background: #e5e7eb; margin: 24px 0; }
+  </style>
+</head>
+<body>
+
+<!-- Sidebar -->
+<aside class="sidebar">
+  <div class="sidebar-header">
+    <h1>🏥 MedisApp</h1>
+    <p>Sistem Manajemen Pasien</p>
+  </div>
+  <nav class="sidebar-nav">
+    <div class="nav-item active" onclick="navigate('dashboard')" id="nav-dashboard">
+      <span class="nav-icon">📊</span> Dashboard
+    </div>
+    <div class="nav-item" onclick="navigate('pasien')" id="nav-pasien">
+      <span class="nav-icon">👥</span> Data Pasien
+    </div>
+    <div class="nav-item" onclick="navigate('rekammedis')" id="nav-rekammedis">
+      <span class="nav-icon">📋</span> Rekam Medis
+    </div>
+  </nav>
+  <div class="sidebar-footer">
+    <div class="service-pill"><span class="dot"></span> Service A · port 3001</div>
+    <div class="service-pill"><span class="dot"></span> Service B · port 3002</div>
+  </div>
+</aside>
+
+<!-- Main -->
+<div class="main">
+  <div class="topbar">
+    <h2 id="page-title">Dashboard</h2>
+    <div id="topbar-action"></div>
+  </div>
+
+  <div class="content">
+
+    <!-- Dashboard -->
+    <div class="page active" id="page-dashboard">
+      <div class="stats-grid">
+        <div class="stat-card stat-blue">
+          <div class="stat-label">Total Pasien</div>
+          <div class="stat-value" id="stat-pasien">–</div>
+          <div class="stat-sub">Terdaftar di Service A</div>
+        </div>
+        <div class="stat-card stat-purple">
+          <div class="stat-label">Total Rekam Medis</div>
+          <div class="stat-value" id="stat-rekam">–</div>
+          <div class="stat-sub">Terdaftar di Service B</div>
+        </div>
+        <div class="stat-card stat-green">
+          <div class="stat-label">Rekam Aktif</div>
+          <div class="stat-value" id="stat-aktif">–</div>
+          <div class="stat-sub">Status aktif</div>
+        </div>
+        <div class="stat-card stat-yellow">
+          <div class="stat-label">Rekam Draft</div>
+          <div class="stat-value" id="stat-draft">–</div>
+          <div class="stat-sub">Menunggu pengisian</div>
+        </div>
+      </div>
+
+      <div class="card" style="margin-bottom:16px">
+        <div class="card-header">
+          <h3>🧪 Test RabbitMQ Queue</h3>
+          <button class="btn btn-secondary btn-sm" onclick="testLoad()">Kirim 10 Pesan Sekaligus</button>
+        </div>
+        <div style="padding:12px 24px;font-size:13px;color:#6b7280" id="test-load-result">Klik tombol untuk melihat grafik Queued Messages di RabbitMQ naik.</div>
+      </div>
+
+      <div class="card">
+        <div class="card-header">
+          <h3>Pasien Terbaru</h3>
+          <button class="btn btn-primary btn-sm" onclick="navigate('pasien')">Lihat Semua →</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>ID</th><th>Nama</th><th>Jenis Kelamin</th><th>Gol. Darah</th><th>Tgl Daftar</th></tr>
+            </thead>
+            <tbody id="dashboard-pasien"><tr><td colspan="5" class="empty-cell">Memuat data...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Data Pasien - List -->
+    <div class="page" id="page-pasien">
+      <div class="card">
+        <div class="card-header">
+          <h3>Daftar Pasien</h3>
+          <div class="toolbar">
+            <input type="text" class="search-input" id="search-pasien" placeholder="🔍 Cari nama / KTP..." oninput="loadPasien()">
+            <button class="btn btn-primary" onclick="navigate('tambah-pasien')">+ Daftar Pasien</button>
+          </div>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>ID</th><th>Nama</th><th>No. KTP</th><th>No. HP</th><th>Jenis Kelamin</th><th>Gol. Darah</th><th>Tgl Lahir</th><th>Aksi</th></tr>
+            </thead>
+            <tbody id="tabel-pasien"><tr><td colspan="8" class="empty-cell">Memuat data...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+    </div>
+
+    <!-- Data Pasien - Form Tambah -->
+    <div class="page" id="page-tambah-pasien">
+      <div class="card">
+        <div class="card-header">
+          <h3>👤 Daftar Pasien Baru</h3>
+          <button class="btn btn-secondary btn-sm" onclick="navigate('pasien')">← Kembali</button>
+        </div>
+        <div style="padding:24px">
+          <div id="alert-tambah-pasien" style="display:none"></div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Nama Lengkap <span class="required">*</span></label>
+              <input type="text" class="form-control" id="tp-name" placeholder="Nama pasien">
+            </div>
+            <div class="form-group">
+              <label>No. KTP (NIK)</label>
+              <input type="text" class="form-control" id="tp-ktp" placeholder="16 digit NIK" maxlength="16">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>No. HP</label>
+              <input type="text" class="form-control" id="tp-hp" placeholder="08xx-xxxx-xxxx">
+            </div>
+            <div class="form-group">
+              <label>Tanggal Lahir <span class="required">*</span></label>
+              <input type="date" class="form-control" id="tp-tgl">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Jenis Kelamin</label>
+              <select class="form-control" id="tp-jk">
+                <option value="">Pilih jenis kelamin</option>
+                <option value="Laki-laki">Laki-laki</option>
+                <option value="Perempuan">Perempuan</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Golongan Darah</label>
+              <select class="form-control" id="tp-gd">
+                <option value="">Pilih golongan darah</option>
+                <option value="A">A</option>
+                <option value="B">B</option>
+                <option value="AB">AB</option>
+                <option value="O">O</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Alamat Lengkap <span class="required">*</span></label>
+            <textarea class="form-control" id="tp-alamat" placeholder="Jl. ..."></textarea>
+          </div>
+          <div style="display:flex;gap:10px;justify-content:flex-end">
+            <button class="btn btn-secondary" onclick="navigate('pasien')">Batal</button>
+            <button class="btn btn-primary" onclick="submitTambahPasien()">Daftarkan Pasien</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Data Pasien - Form Edit -->
+    <div class="page" id="page-edit-pasien">
+      <div class="card">
+        <div class="card-header">
+          <h3>✏️ Edit Data Pasien</h3>
+          <button class="btn btn-secondary btn-sm" onclick="navigate('pasien')">← Kembali</button>
+        </div>
+        <div style="padding:24px">
+          <div id="alert-edit-pasien" style="display:none"></div>
+          <input type="hidden" id="ep-id">
+          <div class="form-row">
+            <div class="form-group">
+              <label>Nama Lengkap <span class="required">*</span></label>
+              <input type="text" class="form-control" id="ep-name" placeholder="Nama pasien">
+            </div>
+            <div class="form-group">
+              <label>No. KTP (NIK)</label>
+              <input type="text" class="form-control" id="ep-ktp" placeholder="16 digit NIK" maxlength="16">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>No. HP</label>
+              <input type="text" class="form-control" id="ep-hp" placeholder="08xx-xxxx-xxxx">
+            </div>
+            <div class="form-group">
+              <label>Tanggal Lahir <span class="required">*</span></label>
+              <input type="date" class="form-control" id="ep-tgl">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Jenis Kelamin</label>
+              <select class="form-control" id="ep-jk">
+                <option value="">Pilih jenis kelamin</option>
+                <option value="Laki-laki">Laki-laki</option>
+                <option value="Perempuan">Perempuan</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Golongan Darah</label>
+              <select class="form-control" id="ep-gd">
+                <option value="">Pilih golongan darah</option>
+                <option value="A">A</option>
+                <option value="B">B</option>
+                <option value="AB">AB</option>
+                <option value="O">O</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Alamat Lengkap <span class="required">*</span></label>
+            <textarea class="form-control" id="ep-alamat" placeholder="Jl. ..."></textarea>
+          </div>
+          <div style="display:flex;gap:10px;justify-content:flex-end">
+            <button class="btn btn-secondary" onclick="navigate('pasien')">Batal</button>
+            <button class="btn btn-success" onclick="submitEditPasien()">💾 Simpan Perubahan</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Rekam Medis - List -->
+    <div class="page" id="page-rekammedis">
+      <div class="card" style="margin-bottom:20px">
+        <div class="card-header">
+          <h3>📋 Daftar Rekam Medis</h3>
+          <button class="btn btn-primary" onclick="navigate('tambah-rekam')">+ Tambah Rekam Medis</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr><th>ID</th><th>Patient ID</th><th>Nama Pasien</th><th>Diagnosis</th><th>Dokter</th><th>Tgl Kunjungan</th><th>Status</th><th>Aksi</th></tr>
+            </thead>
+            <tbody id="tabel-rekammedis"><tr><td colspan="8" class="empty-cell">Memuat data...</td></tr></tbody>
+          </table>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- Rekam Medis - Form Tambah -->
+    <div class="page" id="page-tambah-rekam">
+      <div class="card">
+        <div class="card-header">
+          <h3>📝 Tambah Rekam Medis</h3>
+          <button class="btn btn-secondary btn-sm" onclick="navigate('rekammedis')">← Kembali</button>
+        </div>
+        <div style="padding:24px">
+          <div id="alert-rekam-form" style="display:none"></div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Pilih Pasien <span class="required">*</span></label>
+              <select class="form-control" id="rf-patient">
+                <option value="">-- Pilih pasien --</option>
+              </select>
+            </div>
+            <div class="form-group">
+              <label>Nama Dokter</label>
+              <input type="text" class="form-control" id="rf-dokter" placeholder="dr. ...">
+            </div>
+          </div>
+          <div class="form-row">
+            <div class="form-group">
+              <label>Tanggal Kunjungan</label>
+              <input type="date" class="form-control" id="rf-tgl">
+            </div>
+            <div class="form-group">
+              <label>Status</label>
+              <select class="form-control" id="rf-status">
+                <option value="draft">Draft</option>
+                <option value="aktif">Aktif</option>
+              </select>
+            </div>
+          </div>
+          <div class="form-group">
+            <label>Diagnosis</label>
+            <input type="text" class="form-control" id="rf-diagnosis" placeholder="Contoh: Hipertensi Grade 1">
+          </div>
+          <div class="form-group">
+            <label>Catatan Dokter</label>
+            <textarea class="form-control" id="rf-catatan" placeholder="Resep, saran, tindak lanjut..."></textarea>
+          </div>
+          <div style="display:flex;gap:10px;justify-content:flex-end;margin-top:8px">
+            <button class="btn btn-secondary" onclick="navigate('rekammedis')">Batal</button>
+            <button class="btn btn-primary" onclick="submitRekamBaru()">💾 Simpan Rekam Medis</button>
+          </div>
+        </div>
+      </div>
+    </div>
+
+  </div>
+</div>
+
+<!-- Modal: Detail Pasien -->
+<div class="modal-overlay" id="modal-detail-pasien">
+  <div class="modal" style="width:500px">
+    <div class="modal-header">
+      <h3>🔍 Detail Pasien</h3>
+      <button class="modal-close" onclick="document.getElementById('modal-detail-pasien').classList.remove('open')">✕</button>
+    </div>
+    <div class="modal-body">
+      <table style="width:100%;border:none">
+        <tbody id="detail-pasien-body"></tbody>
+      </table>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="document.getElementById('modal-detail-pasien').classList.remove('open')">Tutup</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Konfirmasi Hapus -->
+<div class="modal-overlay" id="modal-hapus">
+  <div class="modal" style="width:420px">
+    <div class="modal-header">
+      <h3>🗑️ Konfirmasi Hapus</h3>
+      <button class="modal-close" onclick="closeModalHapus()">✕</button>
+    </div>
+    <div class="modal-body">
+      <p style="color:#374151;font-size:15px">Apakah kamu yakin ingin menghapus pasien:</p>
+      <p style="font-weight:600;font-size:16px;margin-top:10px;color:#111827" id="hapus-nama"></p>
+      <p style="font-size:13px;color:#9ca3af;margin-top:8px">Tindakan ini tidak dapat dibatalkan.</p>
+    </div>
+    <div class="modal-footer">
+      <input type="hidden" id="hapus-id">
+      <button class="btn btn-secondary" onclick="closeModalHapus()">Batal</button>
+      <button class="btn btn-danger" onclick="konfirmasiHapus()">Ya, Hapus</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Edit Rekam Medis -->
+<div class="modal-overlay" id="modal-rekam">
+  <div class="modal">
+    <div class="modal-header">
+      <h3>📋 Update Rekam Medis</h3>
+      <button class="modal-close" onclick="closeModalRekam()">✕</button>
+    </div>
+    <div class="modal-body">
+      <div id="alert-rekam" style="display:none"></div>
+      <input type="hidden" id="r-id">
+      <div class="form-row">
+        <div class="form-group">
+          <label>Nama Pasien</label>
+          <input type="text" class="form-control" id="r-name" disabled>
+        </div>
+        <div class="form-group">
+          <label>Nama Dokter</label>
+          <input type="text" class="form-control" id="r-dokter" placeholder="dr. ...">
+        </div>
+      </div>
+      <div class="form-row">
+        <div class="form-group">
+          <label>Tanggal Kunjungan</label>
+          <input type="date" class="form-control" id="r-tgl">
+        </div>
+        <div class="form-group">
+          <label>Status Rekam Medis</label>
+          <select class="form-control" id="r-status">
+            <option value="draft">Draft</option>
+            <option value="aktif">Aktif</option>
+          </select>
+        </div>
+      </div>
+      <div class="form-group">
+        <label>Diagnosis</label>
+        <input type="text" class="form-control" id="r-diagnosis" placeholder="Contoh: Hipertensi Grade 1">
+      </div>
+      <div class="form-group">
+        <label>Catatan Dokter</label>
+        <textarea class="form-control" id="r-catatan" placeholder="Resep, saran, tindak lanjut..."></textarea>
+      </div>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="closeModalRekam()">Batal</button>
+      <button class="btn btn-success" onclick="updateRekam()">💾 Simpan Perubahan</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Detail Rekam Medis -->
+<div class="modal-overlay" id="modal-detail-rekam">
+  <div class="modal" style="width:520px">
+    <div class="modal-header">
+      <h3>🔍 Detail Rekam Medis</h3>
+      <button class="modal-close" onclick="document.getElementById('modal-detail-rekam').classList.remove('open')">✕</button>
+    </div>
+    <div class="modal-body">
+      <table style="width:100%;border:none">
+        <tbody id="detail-rekam-body"></tbody>
+      </table>
+    </div>
+    <div class="modal-footer">
+      <button class="btn btn-secondary" onclick="document.getElementById('modal-detail-rekam').classList.remove('open')">Tutup</button>
+    </div>
+  </div>
+</div>
+
+<!-- Modal: Konfirmasi Hapus Rekam Medis -->
+<div class="modal-overlay" id="modal-hapus-rekam">
+  <div class="modal" style="width:420px">
+    <div class="modal-header">
+      <h3>🗑️ Konfirmasi Hapus</h3>
+      <button class="modal-close" onclick="closeModalHapusRekam()">✕</button>
+    </div>
+    <div class="modal-body">
+      <p style="color:#374151;font-size:15px">Apakah kamu yakin ingin menghapus rekam medis pasien:</p>
+      <p style="font-weight:600;font-size:16px;margin-top:10px;color:#111827" id="hapus-rekam-nama"></p>
+      <p style="font-size:13px;color:#9ca3af;margin-top:8px">Tindakan ini tidak dapat dibatalkan.</p>
+    </div>
+    <div class="modal-footer">
+      <input type="hidden" id="hapus-rekam-id">
+      <button class="btn btn-secondary" onclick="closeModalHapusRekam()">Batal</button>
+      <button class="btn btn-danger" onclick="konfirmasiHapusRekam()">Ya, Hapus</button>
+    </div>
+  </div>
+</div>
+
+<script>
+  const API_A = 'http://localhost:3001';
+  const API_B = 'http://localhost:3002';
+
+  const pages = ['dashboard', 'pasien', 'tambah-pasien', 'edit-pasien', 'rekammedis', 'tambah-rekam'];
+  const pageTitles = { dashboard: 'Dashboard', pasien: 'Data Pasien', 'tambah-pasien': 'Daftar Pasien Baru', 'edit-pasien': 'Edit Data Pasien', rekammedis: 'Rekam Medis', 'tambah-rekam': 'Tambah Rekam Medis' };
+  const navPages = ['dashboard', 'pasien', 'rekammedis'];
+
+  async function navigate(page) {
+    pages.forEach(p => {
+      document.getElementById('page-' + p).classList.toggle('active', p === page);
+    });
+    navPages.forEach(p => {
+      const isActive = p === page || (p === 'rekammedis' && page === 'tambah-rekam') || (p === 'pasien' && (page === 'tambah-pasien' || page === 'edit-pasien'));
+      document.getElementById('nav-' + p).classList.toggle('active', isActive);
+    });
+    document.getElementById('page-title').textContent = pageTitles[page];
+    if (page === 'dashboard') loadDashboard();
+    if (page === 'pasien') loadPasien();
+    if (page === 'tambah-pasien') {
+      hideAlert('alert-tambah-pasien');
+      ['tp-name','tp-ktp','tp-hp','tp-tgl','tp-alamat'].forEach(id => document.getElementById(id).value = '');
+      document.getElementById('tp-jk').value = '';
+      document.getElementById('tp-gd').value = '';
+    }
+    if (page === 'rekammedis') loadRekamMedis();
+    if (page === 'tambah-rekam') {
+      hideAlert('alert-rekam-form');
+      ['rf-dokter','rf-tgl','rf-diagnosis','rf-catatan'].forEach(id => document.getElementById(id).value = '');
+      document.getElementById('rf-status').value = 'draft';
+      try {
+        const data = await fetch(`${API_A}/patients`).then(r => r.json());
+        const sel = document.getElementById('rf-patient');
+        sel.innerHTML = '<option value="">-- Pilih pasien --</option>' +
+          data.map(p => `<option value="${p.id}" data-name="${p.name}">${p.id} - ${p.name}</option>`).join('');
+      } catch { }
+    }
+  }
+
+  async function loadDashboard() {
+    try {
+      const [statsA, statsB, pasienData] = await Promise.all([
+        fetch(`${API_A}/stats`).then(r => r.json()),
+        fetch(`${API_B}/stats`).then(r => r.json()),
+        fetch(`${API_A}/patients`).then(r => r.json()),
+      ]);
+      document.getElementById('stat-pasien').textContent = statsA.total_pasien;
+      document.getElementById('stat-rekam').textContent = statsB.total_rekam_medis;
+      document.getElementById('stat-aktif').textContent = statsB.aktif;
+      document.getElementById('stat-draft').textContent = statsB.draft;
+
+      const tbody = document.getElementById('dashboard-pasien');
+      const recent = pasienData.slice(0, 5);
+      tbody.innerHTML = recent.length === 0
+        ? '<tr><td colspan="5" class="empty-cell">Belum ada pasien terdaftar</td></tr>'
+        : recent.map(p => `<tr>
+            <td><strong>${p.id}</strong></td>
+            <td>${p.name}</td>
+            <td>${p.jenis_kelamin ? `<span class="badge badge-${p.jenis_kelamin === 'Laki-laki' ? 'laki' : 'perempuan'}">${p.jenis_kelamin}</span>` : '–'}</td>
+            <td>${p.golongan_darah || '–'}</td>
+            <td>${new Date(p.created_at).toLocaleDateString('id-ID', {day:'2-digit',month:'short',year:'numeric'})}</td>
+          </tr>`).join('');
+    } catch (e) {
+      console.error(e);
+    }
+  }
+
+  async function loadPasien() {
+    const search = document.getElementById('search-pasien')?.value || '';
+    try {
+      const data = await fetch(`${API_A}/patients?search=${encodeURIComponent(search)}`).then(r => r.json());
+      document.getElementById('tabel-pasien').innerHTML = data.length === 0
+        ? '<tr><td colspan="8" class="empty-cell">Belum ada data pasien</td></tr>'
+        : data.map(p => `<tr>
+            <td><strong>${p.id}</strong></td>
+            <td>${p.name}</td>
+            <td>${p.no_ktp || '–'}</td>
+            <td>${p.no_hp || '–'}</td>
+            <td>${p.jenis_kelamin ? `<span class="badge badge-${p.jenis_kelamin === 'Laki-laki' ? 'laki' : 'perempuan'}">${p.jenis_kelamin}</span>` : '–'}</td>
+            <td>${p.golongan_darah || '–'}</td>
+            <td>${p.tanggal_lahir?.split('T')[0] || '–'}</td>
+            <td style="display:flex;gap:6px;flex-wrap:wrap">
+              <button class="btn btn-outline btn-sm" onclick='openEditPasien(${JSON.stringify(p)})'>✏️ Edit</button>
+              <button class="btn btn-secondary btn-sm" onclick='openDetailPasien(${JSON.stringify(p)})'>🔍 Detail</button>
+              <button class="btn btn-outline-danger btn-sm" onclick='openModalHapus(${p.id}, "${p.name.replace(/"/g,"&quot;")}")'>🗑️ Hapus</button>
+            </td>
+          </tr>`).join('');
+    } catch (e) {
+      document.getElementById('tabel-pasien').innerHTML = '<tr><td colspan="8" style="color:#ef4444;padding:20px;text-align:center">Gagal memuat data Service A</td></tr>';
+    }
+  }
+
+  function openDetailPasien(p) {
+    const rows = [
+      ['ID', p.id],
+      ['Nama', p.name],
+      ['No. KTP', p.no_ktp || '–'],
+      ['No. HP', p.no_hp || '–'],
+      ['Jenis Kelamin', p.jenis_kelamin || '–'],
+      ['Golongan Darah', p.golongan_darah || '–'],
+      ['Tanggal Lahir', p.tanggal_lahir?.split('T')[0] || '–'],
+      ['Alamat', p.alamat || '–'],
+      ['Tgl Daftar', new Date(p.created_at).toLocaleString('id-ID')],
+    ];
+    document.getElementById('detail-pasien-body').innerHTML = rows.map(([k,v]) => `
+      <tr>
+        <td style="padding:8px 0;font-size:13px;color:#6b7280;width:130px;border-bottom:1px solid #f3f4f6">${k}</td>
+        <td style="padding:8px 0;font-size:14px;color:#111827;font-weight:500;border-bottom:1px solid #f3f4f6">${v}</td>
+      </tr>`).join('');
+    document.getElementById('modal-detail-pasien').classList.add('open');
+  }
+
+  function openEditPasien(p) {
+    document.getElementById('ep-id').value = p.id;
+    document.getElementById('ep-name').value = p.name || '';
+    document.getElementById('ep-ktp').value = p.no_ktp || '';
+    document.getElementById('ep-hp').value = p.no_hp || '';
+    document.getElementById('ep-tgl').value = p.tanggal_lahir?.split('T')[0] || '';
+    document.getElementById('ep-jk').value = p.jenis_kelamin || '';
+    document.getElementById('ep-gd').value = p.golongan_darah || '';
+    document.getElementById('ep-alamat').value = p.alamat || '';
+    hideAlert('alert-edit-pasien');
+    navigate('edit-pasien');
+  }
+
+  async function submitTambahPasien() {
+    const name = document.getElementById('tp-name').value.trim();
+    const tanggal_lahir = document.getElementById('tp-tgl').value;
+    const alamat = document.getElementById('tp-alamat').value.trim();
+    if (!name || !tanggal_lahir || !alamat) {
+      showAlert('alert-tambah-pasien', 'error', 'Nama, tanggal lahir, dan alamat wajib diisi!');
+      return;
+    }
+    const body = {
+      name,
+      no_ktp: document.getElementById('tp-ktp').value.trim() || null,
+      no_hp: document.getElementById('tp-hp').value.trim() || null,
+      jenis_kelamin: document.getElementById('tp-jk').value || null,
+      golongan_darah: document.getElementById('tp-gd').value || null,
+      tanggal_lahir, alamat,
+    };
+    try {
+      const res = await fetch(`${API_A}/patients`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      const data = await res.json();
+      if (!res.ok) { showAlert('alert-tambah-pasien', 'error', data.message); return; }
+      showAlert('alert-tambah-pasien', 'success', `✓ Pasien berhasil didaftarkan! ID: ${data.patientId}`);
+      loadDashboard();
+      setTimeout(() => navigate('pasien'), 1200);
+    } catch { showAlert('alert-tambah-pasien', 'error', 'Gagal konek ke Service A!'); }
+  }
+
+  async function submitEditPasien() {
+    const id = document.getElementById('ep-id').value;
+    const name = document.getElementById('ep-name').value.trim();
+    const tanggal_lahir = document.getElementById('ep-tgl').value;
+    const alamat = document.getElementById('ep-alamat').value.trim();
+    if (!name || !tanggal_lahir || !alamat) {
+      showAlert('alert-edit-pasien', 'error', 'Nama, tanggal lahir, dan alamat wajib diisi!');
+      return;
+    }
+    const body = {
+      name,
+      no_ktp: document.getElementById('ep-ktp').value.trim() || null,
+      no_hp: document.getElementById('ep-hp').value.trim() || null,
+      jenis_kelamin: document.getElementById('ep-jk').value || null,
+      golongan_darah: document.getElementById('ep-gd').value || null,
+      tanggal_lahir, alamat,
+    };
+    try {
+      const res = await fetch(`${API_A}/patients/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      if (!res.ok) { showAlert('alert-edit-pasien', 'error', 'Gagal menyimpan perubahan'); return; }
+      showAlert('alert-edit-pasien', 'success', '✓ Data pasien berhasil diperbarui!');
+      loadDashboard();
+      setTimeout(() => navigate('pasien'), 1200);
+    } catch { showAlert('alert-edit-pasien', 'error', 'Gagal konek ke Service A!'); }
+  }
+
+  function openModalHapus(id, nama) {
+    document.getElementById('hapus-id').value = id;
+    document.getElementById('hapus-nama').textContent = nama;
+    document.getElementById('modal-hapus').classList.add('open');
+  }
+  function closeModalHapus() { document.getElementById('modal-hapus').classList.remove('open'); }
+
+  async function konfirmasiHapus() {
+    const id = document.getElementById('hapus-id').value;
+    try {
+      const res = await fetch(`${API_A}/patients/${id}`, { method: 'DELETE' });
+      if (!res.ok) { alert('Gagal menghapus pasien'); return; }
+      closeModalHapus();
+      loadPasien();
+      loadDashboard();
+    } catch { alert('Gagal konek ke Service A!'); }
+  }
+
+
+  async function submitRekamBaru() {
+    const sel = document.getElementById('rf-patient');
+    const patient_id = sel.value;
+    const name = sel.options[sel.selectedIndex]?.dataset.name;
+    if (!patient_id) { showAlert('alert-rekam-form', 'error', 'Pilih pasien terlebih dahulu!'); return; }
+    const body = {
+      patient_id, name,
+      dokter: document.getElementById('rf-dokter').value || null,
+      tanggal_kunjungan: document.getElementById('rf-tgl').value || null,
+      draft_status: document.getElementById('rf-status').value,
+      diagnosis: document.getElementById('rf-diagnosis').value || null,
+      catatan: document.getElementById('rf-catatan').value || null,
+    };
+    try {
+      const res = await fetch(`${API_B}/rekam-medis`, { method: 'POST', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      if (!res.ok) { showAlert('alert-rekam-form', 'error', 'Gagal menyimpan'); return; }
+      showAlert('alert-rekam-form', 'success', '✓ Rekam medis berhasil ditambahkan!');
+      loadDashboard();
+      setTimeout(() => navigate('rekammedis'), 1200);
+    } catch { showAlert('alert-rekam-form', 'error', 'Gagal konek ke Service B'); }
+  }
+
+  async function loadRekamMedis() {
+    try {
+      const data = await fetch(`${API_B}/rekam-medis`).then(r => r.json());
+      document.getElementById('tabel-rekammedis').innerHTML = data.length === 0
+        ? '<tr><td colspan="8" class="empty-cell">Belum ada rekam medis</td></tr>'
+        : data.map(r => `<tr>
+            <td><strong>${r.id}</strong></td>
+            <td>${r.patient_id}</td>
+            <td>${r.name}</td>
+            <td>${r.diagnosis || '<span style="color:#9ca3af">Belum diisi</span>'}</td>
+            <td>${r.dokter || '<span style="color:#9ca3af">–</span>'}</td>
+            <td>${r.tanggal_kunjungan?.split('T')[0] || '–'}</td>
+            <td><span class="badge badge-${r.draft_status}">${r.draft_status}</span></td>
+            <td style="display:flex;gap:6px;flex-wrap:wrap">
+              <button class="btn btn-outline btn-sm" onclick='openEditRekam(${JSON.stringify(r)})'>✏️ Edit</button>
+              <button class="btn btn-secondary btn-sm" onclick='openDetailRekam(${JSON.stringify(r)})'>🔍 Detail</button>
+              <button class="btn btn-outline-danger btn-sm" onclick='openHapusRekam(${r.id}, "${r.name.replace(/"/g,"&quot;")}") '>🗑️ Hapus</button>
+            </td>
+          </tr>`).join('');
+    } catch (e) {
+      document.getElementById('tabel-rekammedis').innerHTML = '<tr><td colspan="8" style="color:#ef4444;padding:20px;text-align:center">Gagal memuat data Service B</td></tr>';
+    }
+  }
+
+
+  // ---- Modal Rekam Medis ----
+  function openEditRekam(r) {
+    document.getElementById('r-id').value = r.id;
+    document.getElementById('r-name').value = r.name;
+    document.getElementById('r-dokter').value = r.dokter || '';
+    document.getElementById('r-tgl').value = r.tanggal_kunjungan?.split('T')[0] || '';
+    document.getElementById('r-status').value = r.draft_status;
+    document.getElementById('r-diagnosis').value = r.diagnosis || '';
+    document.getElementById('r-catatan').value = r.catatan || '';
+    hideAlert('alert-rekam');
+    document.getElementById('modal-rekam').classList.add('open');
+  }
+  function closeModalRekam() { document.getElementById('modal-rekam').classList.remove('open'); }
+
+  async function updateRekam() {
+    const id = document.getElementById('r-id').value;
+    const body = {
+      diagnosis: document.getElementById('r-diagnosis').value || null,
+      dokter: document.getElementById('r-dokter').value || null,
+      catatan: document.getElementById('r-catatan').value || null,
+      tanggal_kunjungan: document.getElementById('r-tgl').value || null,
+      draft_status: document.getElementById('r-status').value,
+    };
+    try {
+      const res = await fetch(`${API_B}/rekam-medis/${id}`, { method: 'PUT', headers: { 'Content-Type': 'application/json' }, body: JSON.stringify(body) });
+      if (!res.ok) { showAlert('alert-rekam', 'error', 'Gagal menyimpan perubahan'); return; }
+      showAlert('alert-rekam', 'success', '✓ Rekam medis berhasil diperbarui!');
+      loadRekamMedis();
+      loadDashboard();
+      setTimeout(closeModalRekam, 1500);
+    } catch {
+      showAlert('alert-rekam', 'error', 'Gagal konek ke Service B!');
+    }
+  }
+
+  async function loadDraft() {
+    try {
+      const data = await fetch(`${API_B}/rekam-medis/draft`).then(r => r.json());
+      document.getElementById('tabel-draft').innerHTML = data.length === 0
+        ? '<tr><td colspan="6" class="empty-cell">Tidak ada draft — semua rekam medis sudah lengkap</td></tr>'
+        : data.map(r => `<tr>
+            <td><strong>${r.id}</strong></td>
+            <td>${r.patient_id}</td>
+            <td>${r.name}</td>
+            <td><span class="badge badge-draft">${r.draft_status}</span></td>
+            <td>${new Date(r.created_at).toLocaleDateString('id-ID', {day:'2-digit',month:'short',year:'numeric'})}</td>
+            <td><button class="btn btn-primary btn-sm" onclick='openEditRekam(${JSON.stringify(r)})'>✏️ Isi Rekam Medis</button></td>
+          </tr>`).join('');
+    } catch {
+      document.getElementById('tabel-draft').innerHTML = '<tr><td colspan="6" style="color:#ef4444;padding:20px;text-align:center">Gagal memuat data Service B</td></tr>';
+    }
+  }
+
+  function openDetailRekam(r) {
+    const rows = [
+      ['ID', r.id],
+      ['Patient ID', r.patient_id],
+      ['Nama Pasien', r.name],
+      ['Diagnosis', r.diagnosis || '–'],
+      ['Dokter', r.dokter || '–'],
+      ['Catatan', r.catatan || '–'],
+      ['Tgl Kunjungan', r.tanggal_kunjungan?.split('T')[0] || '–'],
+      ['Status', `<span class="badge badge-${r.draft_status}">${r.draft_status}</span>`],
+      ['Dibuat', new Date(r.created_at).toLocaleString('id-ID')],
+      ['Diperbarui', new Date(r.updated_at).toLocaleString('id-ID')],
+    ];
+    document.getElementById('detail-rekam-body').innerHTML = rows.map(([k, v]) => `
+      <tr>
+        <td style="padding:8px 0;font-size:13px;color:#6b7280;width:130px;border-bottom:1px solid #f3f4f6">${k}</td>
+        <td style="padding:8px 0;font-size:14px;color:#111827;font-weight:500;border-bottom:1px solid #f3f4f6">${v}</td>
+      </tr>`).join('');
+    document.getElementById('modal-detail-rekam').classList.add('open');
+  }
+
+  function openHapusRekam(id, nama) {
+    document.getElementById('hapus-rekam-id').value = id;
+    document.getElementById('hapus-rekam-nama').textContent = nama;
+    document.getElementById('modal-hapus-rekam').classList.add('open');
+  }
+  function closeModalHapusRekam() { document.getElementById('modal-hapus-rekam').classList.remove('open'); }
+
+  async function konfirmasiHapusRekam() {
+    const id = document.getElementById('hapus-rekam-id').value;
+    try {
+      const res = await fetch(`${API_B}/rekam-medis/${id}`, { method: 'DELETE' });
+      if (!res.ok) { alert('Gagal menghapus rekam medis'); return; }
+      closeModalHapusRekam();
+      loadRekamMedis();
+      loadDashboard();
+    } catch { alert('Gagal konek ke Service B!'); }
+  }
+
+  // ---- Helpers ----
+  function showAlert(id, type, msg) {
+    const el = document.getElementById(id);
+    el.className = `alert alert-${type}`;
+    el.textContent = msg;
+    el.style.display = 'block';
+  }
+  function hideAlert(id) {
+    document.getElementById(id).style.display = 'none';
+  }
+
+  async function testLoad() {
+    const el = document.getElementById('test-load-result');
+    el.textContent = 'Mengirim pesan...';
+    try {
+      const res = await fetch(`${API_A}/test-load?n=10`, { method: 'POST' });
+      const data = await res.json();
+      el.textContent = '✓ ' + data.message + ' — lihat grafik di RabbitMQ Management!';
+    } catch {
+      el.textContent = 'Gagal konek ke Service A';
+    }
+  }
+
+  // Auto-refresh setiap 3 detik
+  setInterval(() => {
+    const activePage = pages.find(p => document.getElementById('page-' + p).classList.contains('active'));
+    if (activePage === 'dashboard') loadDashboard();
+    if (activePage === 'pasien') loadPasien();
+    if (activePage === 'rekammedis') loadRekamMedis();
+  }, 3000);
+
+  // Init
+  loadDashboard();
+</script>
+</body>
+</html>

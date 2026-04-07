@@ -1,0 +1,111 @@
+version: '3.8'
+
+services:
+  # Database untuk Service A (Pendaftaran)
+  db-service-a:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: db_pendaftaran
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5432:5432"
+    volumes:
+      - db-service-a-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  # Database untuk Service B (Rekam Medis)
+  db-service-b:
+    image: postgres:15
+    environment:
+      POSTGRES_DB: db_rekammedis
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+    ports:
+      - "5433:5432"
+    volumes:
+      - db-service-b-data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
+
+  # RabbitMQ
+  rabbitmq:
+    image: rabbitmq:3-management
+    ports:
+      - "5672:5672"
+      - "15672:15672"
+
+  # Service A - Pendaftaran
+  service-a:
+    build: ./service-a
+    ports:
+      - "3001:3001"
+    environment:
+      DB_HOST: db-service-a
+      DB_PORT: 5432
+      DB_NAME: db_pendaftaran
+      DB_USER: postgres
+      DB_PASS: postgres
+      RABBITMQ_URL: amqp://rabbitmq
+      GRPC_HOST: service-b
+    volumes:
+      - ./service-a:/app
+      - ./proto:/proto
+      - /app/node_modules
+    depends_on:
+      db-service-a:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_started
+      service-b:
+        condition: service_started
+    restart: unless-stopped
+
+  # Service B - Rekam Medis
+  service-b:
+    build: ./service-b
+    ports:
+      - "3002:3002"
+      - "50051:50051"
+    environment:
+      DB_HOST: db-service-b
+      DB_PORT: 5432
+      DB_NAME: db_rekammedis
+      DB_USER: postgres
+      DB_PASS: postgres
+      RABBITMQ_URL: amqp://rabbitmq
+    volumes:
+      - ./service-b:/app
+      - ./proto:/proto
+      - /app/node_modules
+    depends_on:
+      db-service-b:
+        condition: service_healthy
+      rabbitmq:
+        condition: service_started
+    restart: unless-stopped
+
+  # Frontend
+  frontend:
+    build: ./frontend
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./frontend:/app
+      - /app/node_modules
+    depends_on:
+      - service-a
+      - service-b
+
+volumes:
+  db-service-a-data:
+  db-service-b-data:
