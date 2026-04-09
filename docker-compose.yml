@@ -1,33 +1,42 @@
 version: '3.8'
 
 services:
-  # Database untuk Service A (Pendaftaran)
+
+  # ─────────────────────────────────────────────
+  # DATABASE SERVICE A
+  # Menyimpan data pasien (tabel: pasien)
+  # Hanya boleh diakses oleh service-a
+  # ─────────────────────────────────────────────
   db-service-a:
     image: postgres:15
     environment:
-      POSTGRES_DB: db_pendaftaran
+      POSTGRES_DB: db_pendaftaran     # nama database
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
     ports:
-      - "5432:5432"
+      - "5432:5432"                   # host:container
     volumes:
-      - db-service-a-data:/var/lib/postgresql/data
+      - db-service-a-data:/var/lib/postgresql/data  # data tersimpan permanen
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      test: ["CMD-SHELL", "pg_isready -U postgres"] # cek apakah DB sudah siap
       interval: 5s
       timeout: 5s
       retries: 10
     restart: unless-stopped
 
-  # Database untuk Service B (Rekam Medis)
+  # ─────────────────────────────────────────────
+  # DATABASE SERVICE B
+  # Menyimpan data rekam medis (tabel: rekam_medis)
+  # Hanya boleh diakses oleh service-b
+  # ─────────────────────────────────────────────
   db-service-b:
     image: postgres:15
     environment:
-      POSTGRES_DB: db_rekammedis
+      POSTGRES_DB: db_rekammedis      # nama database berbeda → isolasi DB
       POSTGRES_USER: postgres
       POSTGRES_PASSWORD: postgres
     ports:
-      - "5433:5432"
+      - "5433:5432"                   # port host berbeda (5433) agar tidak bentrok dengan db-service-a
     volumes:
       - db-service-b-data:/var/lib/postgresql/data
     healthcheck:
@@ -37,75 +46,96 @@ services:
       retries: 10
     restart: unless-stopped
 
-  # RabbitMQ
+  # ─────────────────────────────────────────────
+  # RABBITMQ — Message Broker
+  # Menampung antrian pesan antar service (asynchronous)
+  # Port 5672 : komunikasi AMQP (dipakai service)
+  # Port 15672: dashboard monitoring RabbitMQ (buka di browser)
+  # ─────────────────────────────────────────────
   rabbitmq:
     image: rabbitmq:3-management
     ports:
-      - "5672:5672"
-      - "15672:15672"
+      - "5672:5672"                   # port AMQP untuk koneksi service
+      - "15672:15672"                 # port dashboard web RabbitMQ
 
-  # Service A - Pendaftaran
+  # ─────────────────────────────────────────────
+  # SERVICE A — Backend Pendaftaran Pasien
+  # Tugasnya: menyimpan data pasien, validasi via gRPC,
+  #           dan publish event ke RabbitMQ
+  # ─────────────────────────────────────────────
   service-a:
-    build: ./service-a
+    build: ./service-a                # build dari Dockerfile di folder service-a
     ports:
-      - "3001:3001"
+      - "3001:3001"                   # HTTP API Service A
     environment:
-      DB_HOST: db-service-a
+      DB_HOST: db-service-a           # koneksi ke database miliknya sendiri
       DB_PORT: 5432
       DB_NAME: db_pendaftaran
       DB_USER: postgres
       DB_PASS: postgres
-      RABBITMQ_URL: amqp://rabbitmq
-      GRPC_HOST: service-b
+      RABBITMQ_URL: amqp://rabbitmq   # koneksi ke RabbitMQ
+      GRPC_HOST: service-b            # alamat gRPC Service B
     volumes:
       - ./service-a:/app
-      - ./proto:/proto
+      - ./proto:/proto                # proto dibagi pakai (contract-first)
       - /app/node_modules
     depends_on:
       db-service-a:
-        condition: service_healthy
+        condition: service_healthy    # tunggu DB siap dulu
       rabbitmq:
         condition: service_started
       service-b:
-        condition: service_started
+        condition: service_started    # tunggu Service B siap (karena perlu gRPC ke sana)
     restart: unless-stopped
 
-  # Service B - Rekam Medis
+  # ─────────────────────────────────────────────
+  # SERVICE B — Backend Rekam Medis
+  # Tugasnya: menyimpan rekam medis, melayani gRPC dari Service A,
+  #           dan consume event dari RabbitMQ untuk buat draft rekam medis
+  # ─────────────────────────────────────────────
   service-b:
-    build: ./service-b
+    build: ./service-b                # build dari Dockerfile di folder service-b
     ports:
-      - "3002:3002"
-      - "50051:50051"
+      - "3002:3002"                   # HTTP API Service B
+      - "50051:50051"                 # port gRPC (dipakai Service A untuk komunikasi)
     environment:
-      DB_HOST: db-service-b
+      DB_HOST: db-service-b           # koneksi ke database miliknya sendiri
       DB_PORT: 5432
       DB_NAME: db_rekammedis
       DB_USER: postgres
       DB_PASS: postgres
-      RABBITMQ_URL: amqp://rabbitmq
+      RABBITMQ_URL: amqp://rabbitmq   # koneksi ke RabbitMQ (untuk consume event)
     volumes:
       - ./service-b:/app
-      - ./proto:/proto
+      - ./proto:/proto                # proto dibagi pakai (contract-first)
       - /app/node_modules
     depends_on:
       db-service-b:
-        condition: service_healthy
+        condition: service_healthy    # tunggu DB siap dulu
       rabbitmq:
         condition: service_started
     restart: unless-stopped
 
-  # Frontend
+  # ─────────────────────────────────────────────
+  # FRONTEND
+  # Antarmuka pengguna berbasis web
+  # Berkomunikasi langsung ke Service A (port 3001) dan Service B (port 3002)
+  # ─────────────────────────────────────────────
   frontend:
-    build: ./frontend
+    build: ./frontend                 # build dari Dockerfile di folder frontend
     ports:
-      - "3000:3000"
+      - "3000:3000"                   # buka di browser: http://localhost:3000
     volumes:
       - ./frontend:/app
       - /app/node_modules
     depends_on:
-      - service-a
+      - service-a                     # tunggu kedua backend siap dulu
       - service-b
 
+# ─────────────────────────────────────────────
+# VOLUMES — Penyimpanan permanen untuk database
+# Data tidak hilang meski container di-restart
+# ─────────────────────────────────────────────
 volumes:
   db-service-a-data:
   db-service-b-data:

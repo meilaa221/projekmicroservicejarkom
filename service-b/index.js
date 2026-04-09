@@ -56,11 +56,40 @@ async function initDB(retries = 10) {
 // gRPC handler
 function validateMedicalRecord(call, callback) {
   const { patientId, name } = call.request;
-  console.log('gRPC request masuk:', patientId, name);
-  callback(null, {
-    is_valid: true,
-    message: 'Data valid',
-    draft_record_id: 'DRAFT-' + patientId,
+  console.log(`[gRPC] validateMedicalRecord → patient_id: ${patientId}, name: ${name}`);
+  pool.query(
+    'SELECT id FROM rekam_medis WHERE LOWER(name) = LOWER($1)',
+    [name]
+  ).then(result => {
+    const sudahAda = result.rows.length > 0;
+    console.log(`[gRPC] validateMedicalRecord → is_valid: ${!sudahAda}, message: ${sudahAda ? 'sudah punya rekam medis' : 'data valid'}`);
+    callback(null, {
+      is_valid: !sudahAda,
+      message: sudahAda ? 'Pasien sudah punya rekam medis di Service B' : 'Data valid',
+      draft_record_id: 'DRAFT-' + patientId,
+    });
+  }).catch(err => {
+    console.error('[gRPC] validateMedicalRecord error:', err.message);
+    callback(err);
+  });
+}
+
+function checkPatientRecord(call, callback) {
+  const { patientId } = call.request;
+  console.log(`[gRPC] checkPatientRecord → patient_id: ${patientId}`);
+  pool.query(
+    'SELECT id FROM rekam_medis WHERE patient_id=$1',
+    [patientId]
+  ).then(result => {
+    const hasRecord = result.rows.length > 0;
+    console.log(`[gRPC] checkPatientRecord → has_record: ${hasRecord}`);
+    callback(null, {
+      has_record: hasRecord,
+      message: hasRecord ? 'Pasien memiliki rekam medis' : 'Tidak ada rekam medis',
+    });
+  }).catch(err => {
+    console.error('[gRPC] checkPatientRecord error:', err.message);
+    callback(err);
   });
 }
 
@@ -161,7 +190,7 @@ app.get('/stats', async (req, res) => {
 
 function startGrpcServer() {
   const server = new grpc.Server();
-  server.addService(patientProto.PatientService.service, { validateMedicalRecord });
+  server.addService(patientProto.PatientService.service, { validateMedicalRecord, checkPatientRecord });
   server.bindAsync('0.0.0.0:50051', grpc.ServerCredentials.createInsecure(), () => {
     console.log('gRPC Service B jalan di port 50051');
   });

@@ -52,11 +52,11 @@ async function publishEvent(data) {
     const channel = await conn.createChannel();
     await channel.assertQueue('patient.registered');
     channel.sendToQueue('patient.registered', Buffer.from(JSON.stringify(data)));
-    console.log('Event dikirim ke RabbitMQ:', data.name);
+    console.log(`[RabbitMQ] Publish → queue: patient.registered, name: ${data.name}`);
     await channel.close();
     await conn.close();
   } catch (err) {
-    console.error('RabbitMQ publish error:', err.message);
+    console.error('[RabbitMQ] Publish error:', err.message);
   }
 }
 
@@ -76,12 +76,23 @@ app.post('/patients', async (req, res) => {
     );
     const patientId = result.rows[0].id.toString();
 
+    console.log(`[gRPC] validateMedicalRecord → patient_id: ${patientId}, name: ${name}`);
     grpcClient.validateMedicalRecord({ patientId, name }, async (err, response) => {
-      if (err) console.error('gRPC error:', err.message);
-      else console.log('gRPC response:', response);
+      if (err) {
+        console.error('[gRPC] Error:', err.message);
+        await pool.query('DELETE FROM pasien WHERE id=$1', [patientId]);
+        return res.status(500).json({ success: false, message: 'Gagal validasi ke Service B' });
+      }
+
+      console.log(`[gRPC] Response → is_valid: ${response.is_valid}, message: ${response.message}`);
+
+      if (!response.is_valid) {
+        await pool.query('DELETE FROM pasien WHERE id=$1', [patientId]);
+        console.log(`[gRPC] Pendaftaran ditolak → pasien "${name}" dihapus dari DB`);
+        return res.status(409).json({ success: false, message: response.message });
+      }
 
       await publishEvent({ patientId, name, tanggal_lahir, alamat, jenis_kelamin, golongan_darah });
-
       res.json({ success: true, message: 'Pasien berhasil didaftarkan', patientId });
     });
   } catch (err) {
@@ -151,9 +162,25 @@ app.put('/patients/:id', async (req, res) => {
 
 // DELETE - hapus pasien
 app.delete('/patients/:id', async (req, res) => {
-  const result = await pool.query('DELETE FROM pasien WHERE id=$1 RETURNING id', [req.params.id]);
-  if (result.rows.length === 0) return res.status(404).json({ success: false, message: 'Pasien tidak ditemukan' });
-  res.json({ success: true, message: 'Pasien berhasil dihapus' });
+  const pasien = await pool.query('SELECT id FROM pasien WHERE id=$1', [req.params.id]);
+  if (pasien.rows.length === 0) return res.status(404).json({ success: false, message: 'Pasien tidak ditemukan' });
+
+  grpcClient.checkPatientRecord({ patientId: req.params.id, name: '' }, async (err, response) => {
+    if (err) {
+      console.error('gRPC checkPatientRecord error:', err.message);
+      return res.status(500).json({ success: false, message: 'Gagal cek rekam medis ke Service B' });
+    }
+
+    if (response.has_record) {
+      return res.status(409).json({
+        success: false,
+        message: 'Pasien tidak dapat dihapus karena memiliki rekam medis di Service B',
+      });
+    }
+
+    const result = await pool.query('DELETE FROM pasien WHERE id=$1 RETURNING id', [req.params.id]);
+    res.json({ success: true, message: 'Pasien berhasil dihapus' });
+  });
 });
 
 // GET - stats

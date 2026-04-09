@@ -2,17 +2,33 @@ syntax = "proto3";
 
 package patient;
 
+// Kontrak komunikasi gRPC antara Service A (Pendaftaran) dan Service B (Rekam Medis).
+// File ini dibuat lebih dulu (contract-first) sebelum implementasi di kedua service.
 service PatientService {
+  // Dipanggil Service A saat mendaftarkan pasien baru.
+  // Service B mengecek apakah nama pasien sudah punya rekam medis.
   rpc ValidateMedicalRecord (PatientRequest) returns (MedicalResponse);
+
+  // Dipanggil Service A sebelum menghapus pasien.
+  // Service B mengecek apakah pasien masih punya rekam medis (apapun statusnya).
+  rpc CheckPatientRecord (PatientRequest) returns (CheckResponse);
 }
 
+// Data yang dikirim Service A ke Service B
 message PatientRequest {
   string patient_id = 1;
   string name = 2;
 }
 
+// Respons validasi saat pendaftaran pasien baru
 message MedicalResponse {
   bool is_valid = 1;
   string message = 2;
   string draft_record_id = 3;
+}
+
+// Respons pengecekan saat hapus pasien
+message CheckResponse {
+  bool has_record = 1;
+  string message = 2;
 }
